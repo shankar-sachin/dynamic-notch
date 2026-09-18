@@ -29,6 +29,9 @@ final class NotchViewModel {
     var privacy = PrivacyState()
     /// The screen is locked (or this session was switched away from).
     var isLocked = false
+    /// Paused long enough that the pill has handed the notch back. The track is
+    /// still here — open the panel and it's waiting — it just isn't on show.
+    var musicDormant = false
     /// Left edge of the menu bar's status items, in global coordinates, as far
     /// as we can see it. The closed pill won't spread past it.
     var menuBarLeftEdge: CGFloat?
@@ -44,6 +47,10 @@ final class NotchViewModel {
     var isInteractionLocked = false
     /// A menu is open somewhere; stay out of its way.
     var isMenuBarBusy = false
+    /// The pointer is over the notch. Kept by the window controller, which is
+    /// the thing actually watching the mouse — reading `NSEvent.mouseLocation`
+    /// from in here made behaviour depend on global state nothing could control.
+    var isPointerInside = false
 
     /// Wired up by the media service; the UI never talks to Music or Spotify itself.
     var onMediaCommand: ((MediaCommand) -> Void)?
@@ -233,8 +240,7 @@ final class NotchViewModel {
         withAnimation(Motion.close) { deviceSpotlight = nil }
 
         // If they've reached for it, it's theirs now — leave it open.
-        let pointerIsHere = hoverRect.contains(NSEvent.mouseLocation)
-        guard !pointerIsHere, !isInteractionLocked else { return }
+        guard !isPointerInside, !isInteractionLocked else { return }
         collapse()
     }
 

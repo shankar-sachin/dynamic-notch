@@ -152,6 +152,8 @@ private struct TimerFace: View {
                         Text(status(timer))
                             .font(.system(size: 11.5, weight: .semibold))
                             .foregroundStyle(.white.opacity(0.7))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                     }
 
                     if timer.source == .clock {

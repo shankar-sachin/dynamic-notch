@@ -12,6 +12,10 @@ import SwiftUI
 ///
 /// Apps that aren't running are never touched, so polling can't resurrect a
 /// music app you deliberately quit.
+///
+/// Paused music gives the notch back. After `dormantAfter` the pill shrinks to
+/// bare hardware, while the panel keeps the track — so what you paused is still
+/// there when you look, without sitting in your menu bar all afternoon.
 @MainActor
 final class MediaService {
     private let model: NotchViewModel
@@ -20,6 +24,7 @@ final class MediaService {
     private var pollTask: Task<Void, Never>?
     private var nudgeTask: Task<Void, Never>?
     private var artworkTask: Task<Void, Never>?
+    private var dormantTask: Task<Void, Never>?
     private var observers: [NSObjectProtocol] = []
 
     private var artwork: (key: String, image: NSImage?, accent: Color)?
@@ -69,6 +74,7 @@ final class MediaService {
     }
 
     func stop() {
+        dormantTask?.cancel()
         pollTask?.cancel()
         nudgeTask?.cancel()
         artworkTask?.cancel()
@@ -77,6 +83,9 @@ final class MediaService {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         observers.removeAll()
     }
+
+    /// How long paused music keeps its place in the pill.
+    private let dormantAfter = Duration.seconds(10)
 
     /// Fast while playing (the scrubber needs it), lazy otherwise.
     private var pollInterval: Duration {
@@ -148,6 +157,9 @@ final class MediaService {
 
     private func apply(_ reading: PlayerReading?) {
         guard let reading, !reading.isStopped, !reading.title.isEmpty, model.settings.showNowPlaying else {
+            dormantTask?.cancel()
+            dormantTask = nil
+            model.musicDormant = false
             if model.nowPlaying != nil {
                 withAnimation(Motion.pill) { model.nowPlaying = nil }
             }
@@ -173,12 +185,35 @@ final class MediaService {
             accent: artwork?.accent ?? reading.app.tint
         )
 
+        trackDormancy(isPlaying: reading.isPlaying)
+
         // Only animate when something a human can see has changed — otherwise
         // the once-a-second position sample would re-animate the whole pill.
         if let current = model.nowPlaying, !current.differsVisibly(from: snapshot) {
             model.nowPlaying = snapshot
         } else {
             withAnimation(Motion.pill) { model.nowPlaying = snapshot }
+        }
+    }
+
+    /// Starts (or cancels) the countdown to handing the notch back.
+    private func trackDormancy(isPlaying: Bool) {
+        if isPlaying {
+            dormantTask?.cancel()
+            dormantTask = nil
+            if model.musicDormant {
+                withAnimation(Motion.pill) { model.musicDormant = false }
+            }
+            return
+        }
+
+        guard dormantTask == nil, !model.musicDormant else { return }
+        dormantTask = Task { [weak self] in
+            guard let self else { return }
+            try? await Task.sleep(for: dormantAfter)
+            guard !Task.isCancelled else { return }
+            withAnimation(Motion.pill) { model.musicDormant = true }
+            Log.media.info("paused long enough; notch handed back")
         }
     }
 
@@ -233,6 +268,7 @@ final class MediaService {
             snapshot.isPlaying.toggle()
             snapshot.position = snapshot.position(at: .now)
             snapshot.sampledAt = .now
+            trackDormancy(isPlaying: snapshot.isPlaying)
             withAnimation(Motion.pill) { model.nowPlaying = snapshot }
         }
         if case .seek(let position) = command, var snapshot = model.nowPlaying {

@@ -49,15 +49,16 @@ struct NowPlayingPanel: View {
                 .shadow(color: track.accent.opacity(0.22), radius: 34)
 
             VStack(alignment: .leading, spacing: 2) {
-                MarqueeText(text: track.title, font: .system(size: 15, weight: .semibold))
-                    .frame(height: 19)
+                NotchText(
+                    text: track.title,
+                    font: .system(size: 15, weight: .semibold)
+                )
 
-                MarqueeText(
+                NotchText(
                     text: [track.artist, track.album].filter { !$0.isEmpty }.joined(separator: " — "),
                     font: .system(size: 11.5, weight: .medium),
                     color: .white.opacity(0.52)
                 )
-                .frame(height: 15)
 
                 Spacer(minLength: 4)
 

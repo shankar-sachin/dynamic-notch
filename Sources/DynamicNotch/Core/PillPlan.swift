@@ -72,7 +72,9 @@ extension NotchViewModel {
             }
         }
 
-        let track = (nowPlaying?.isEmpty == false) ? nowPlaying : nil
+        // Dormant music keeps the panel but gives up the pill: a notch that
+        // stays fat for a track you paused an hour ago is just clutter.
+        let track = (nowPlaying?.isEmpty == false && !musicDormant) ? nowPlaying : nil
         // A countdown is going somewhere, so it outranks a stopwatch for the
         // one readout the pill has room for.
         let running = stopwatch?.isRunning == true ? stopwatch : nil

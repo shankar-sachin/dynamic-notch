@@ -180,6 +180,20 @@ struct SpotlightTests {
         #expect(!model.isExpanded)
     }
 
+    @Test("A card you've reached for stays open when its time is up")
+    @MainActor
+    func pointerKeepsItOpen() {
+        let model = model()
+        model.spotlight(pods)
+        // The pointer arrived while the card was showing.
+        model.isPointerInside = true
+        model.endSpotlight()
+
+        // The card itself goes; the panel stays, because it's yours now.
+        #expect(model.deviceSpotlight == nil)
+        #expect(model.isExpanded)
+    }
+
     @Test("Collapsing for any other reason doesn't strand the card")
     @MainActor
     func collapseClearsTheCard() {

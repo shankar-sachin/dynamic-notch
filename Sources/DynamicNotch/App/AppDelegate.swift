@@ -59,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         controller.start()
 
         shelf = ShelfStore(model: model)
+        shelf.restore()
         controller.shelf = shelf
         model.shelfStore = shelf
         model.shareAnchor = { [weak self] in self?.controller.anchorView }

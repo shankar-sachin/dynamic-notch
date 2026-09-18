@@ -190,6 +190,7 @@ final class NotchWindowController {
 
     private func pointerMoved(dragging: Bool) {
         let inside = model.hoverRect.contains(NSEvent.mouseLocation)
+        model.isPointerInside = inside
         if inside {
             model.pointerEntered(dragging: dragging)
         } else if wasInside || model.isExpanded || model.isHinting {

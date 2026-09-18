@@ -18,8 +18,9 @@ pointer to it and it unfurls into a player and a file shelf.
 ## What it does
 
 - **Now Playing** — Apple Music and Spotify. Artwork in the pill, an accent colour
-  pulled from the cover, a marquee title, a draggable scrubber and transport
-  controls. No private APIs.
+  pulled from the cover, a draggable scrubber and transport controls. No private
+  APIs. Pause for ten seconds and the pill hands the notch back to the hardware,
+  keeping the track for whoever opens the panel.
 - **Volume & brightness** — screen brightness, keyboard backlight and system
   volume render as an inline bar in the notch.
 - **File shelf** — drag files at the notch and it opens to catch them. Drag them
@@ -155,9 +156,9 @@ bezel melting outward instead of a bar taped under the menu bar.
 - macOS still shows its own volume and brightness HUD alongside this one.
   Suppressing it means unloading a system agent, which this app won't do to your
   Mac behind your back.
-- The shelf holds references to your files, not copies, so moving or deleting a
-  file elsewhere leaves a dead entry until you remove it. Shelf contents don't
-  survive a relaunch yet.
+- The shelf holds references to your files, not copies. It survives quitting —
+  only paths are saved — and anything moved or deleted elsewhere is dropped on
+  the way back in rather than left as an entry that won't open.
 - The closed pill won't spread over your menu bar icons, but it finds the
   boundary by measuring *our own* status item — the newest item sits at the left
   of the row, so ours usually is. An app that launches after this one takes that

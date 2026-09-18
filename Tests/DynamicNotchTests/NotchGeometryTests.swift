@@ -76,3 +76,78 @@ struct NotchGeometryTests {
         #expect(metrics.notchRect == CGRect(x: 663.5, y: 950, width: 185, height: 32))
     }
 }
+
+@Suite("Pill contents")
+struct PillPlanTests {
+    @MainActor
+    private func model() -> NotchViewModel {
+        NotchViewModel(metrics: NotchMetrics(
+            screenFrame: CGRect(x: 0, y: 0, width: 1512, height: 982),
+            notchSize: CGSize(width: 185, height: 32),
+            notchCenterX: 756,
+            isPhysical: true
+        ))
+    }
+
+    private var track: NowPlayingSnapshot {
+        NowPlayingSnapshot(
+            source: .spotify, title: "Kanave Nee Naan", artist: "Sooraj Santhosh",
+            album: "Kannum Kannum Kollaiyadithaal (Original Motion Picture Soundtrack)",
+            isPlaying: false, duration: 240, position: 76,
+            sampledAt: .now, artwork: nil, accent: .white
+        )
+    }
+
+    @Test("Playing music takes both ears")
+    @MainActor
+    func musicFillsThePill() {
+        let model = model()
+        model.nowPlaying = track
+
+        #expect(model.pill.units == 2)
+        #expect(model.mode == .ambient)
+    }
+
+    @Test("Music paused long enough hands the notch back")
+    @MainActor
+    func dormantMusicReleasesThePill() {
+        let model = model()
+        model.nowPlaying = track
+        model.musicDormant = true
+
+        // Bare hardware again: nothing drawn, nothing sticking out.
+        #expect(model.pill.units == 0)
+        #expect(model.mode == .idle)
+        #expect(model.presentation.bodySize == model.metrics.notchSize)
+
+        // But the track is still there for whoever opens the panel.
+        #expect(model.nowPlaying != nil)
+    }
+
+    @Test("A timer still shows even while the music is dormant")
+    @MainActor
+    func dormantMusicDoesNotSilenceTimers() {
+        let model = model()
+        model.nowPlaying = track
+        model.musicDormant = true
+        model.timer = TimerState(total: 300, endDate: .now.addingTimeInterval(120))
+
+        #expect(model.mode == .ambient)
+        if case .timerCountdown = model.pill.trailing {} else {
+            Issue.record("the timer should have the trailing ear")
+        }
+    }
+
+    @Test("The pill never spreads past the menu bar icons")
+    @MainActor
+    func pillRespectsTheMenuBar() {
+        let model = model()
+        model.nowPlaying = track
+        let unbounded = model.presentation.outerWidth
+
+        // Icons sitting close to the notch leave less room to grow into.
+        model.menuBarLeftEdge = 880
+        #expect(model.presentation.outerWidth < unbounded)
+        #expect(model.presentation.outerWidth / 2 + model.metrics.notchCenterX <= 880)
+    }
+}

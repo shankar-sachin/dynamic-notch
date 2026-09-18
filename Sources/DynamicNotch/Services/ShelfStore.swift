@@ -21,6 +21,11 @@ struct ShelfItem: Identifiable, Equatable {
 /// pointer to your file, not a duplicate of it. Dropped *content* (an image
 /// dragged out of a browser, a snippet of text) has no file yet, so it gets
 /// written into Application Support and cleaned up when removed.
+///
+/// The shelf survives quitting. Only paths are saved, never icons or contents,
+/// and anything that has since been moved, renamed or deleted is dropped on the
+/// way back in — a shelf full of entries that no longer open would be worse
+/// than an empty one.
 @MainActor
 final class ShelfStore {
     private let model: NotchViewModel
@@ -35,6 +40,59 @@ final class ShelfStore {
 
     init(model: NotchViewModel) {
         self.model = model
+    }
+
+    // MARK: Persistence
+
+    private var ledger: URL { stagingDirectory.appendingPathComponent("shelf.json") }
+
+    private struct Entry: Codable {
+        var path: String
+        var name: String
+        var isStaged: Bool
+    }
+
+    /// Called at launch.
+    func restore() {
+        guard let data = try? Data(contentsOf: ledger),
+              let entries = try? JSONDecoder().decode([Entry].self, from: data)
+        else { return }
+
+        let manager = FileManager.default
+        var recovered: [ShelfItem] = []
+        var lost = 0
+
+        for entry in entries {
+            guard manager.fileExists(atPath: entry.path) else {
+                lost += 1
+                continue
+            }
+            let url = URL(fileURLWithPath: entry.path)
+            recovered.append(
+                ShelfItem(
+                    url: url,
+                    // Follow a rename rather than showing the old name.
+                    name: url.lastPathComponent,
+                    icon: NSWorkspace.shared.icon(forFile: entry.path),
+                    isStaged: entry.isStaged
+                )
+            )
+        }
+
+        model.shelf = recovered
+        if lost > 0 { save() }
+        Log.app.info("shelf restored \(recovered.count) item(s), dropped \(lost) missing")
+    }
+
+    private func save() {
+        let entries = model.shelf.map {
+            Entry(path: $0.url.path, name: $0.name, isStaged: $0.isStaged)
+        }
+        do {
+            try JSONEncoder().encode(entries).write(to: ledger, options: .atomic)
+        } catch {
+            Log.app.error("shelf save failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     // MARK: Dropping
@@ -76,6 +134,7 @@ final class ShelfStore {
             }
         }
 
+        save()
         model.present(.event(EventActivity(
             symbol: "tray.and.arrow.down.fill",
             tint: .white,
@@ -136,6 +195,7 @@ final class ShelfStore {
         if item.isStaged {
             try? FileManager.default.removeItem(at: item.url)
         }
+        save()
     }
 
     func clear() {
@@ -144,6 +204,7 @@ final class ShelfStore {
         for item in staged {
             try? FileManager.default.removeItem(at: item.url)
         }
+        save()
     }
 
     func reveal(_ item: ShelfItem) {
