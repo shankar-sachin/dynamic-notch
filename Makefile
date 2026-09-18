@@ -10,7 +10,7 @@ RELEASE  := $(DERIVED)/Build/Products/Release/$(APP).app
 SLUG     := DynamicNotch
 VERSION  := $(shell /usr/libexec/PlistBuddy -c "Print MARKETING_VERSION" /dev/stdin <<< "$$(plutil -convert xml1 -o - Sources/DynamicNotch/Resources/Info.plist 2>/dev/null)" 2>/dev/null || echo 1.0)
 
-.PHONY: all project build run kill clean test install uninstall logs release dmg zip dist-clean
+.PHONY: all project build run kill clean test install uninstall logs release dmg zip dist-clean docs
 
 all: build
 
@@ -59,7 +59,7 @@ $(DIST)/$(SLUG).app: release
 	@codesign --force --sign - --timestamp=none "$(DIST)/$(APP).app"
 	@codesign --verify --strict "$(DIST)/$(APP).app" && echo "▸ signed (ad-hoc)"
 
-dmg: $(DIST)/$(SLUG).app ## build a drag-to-install .dmg for a GitHub release
+dmg: docs $(DIST)/$(SLUG).app ## build a drag-to-install .dmg for a GitHub release
 	@rm -rf "$(DIST)/stage" "$(DIST)/$(SLUG)-$(VERSION).dmg"
 	@mkdir -p "$(DIST)/stage"
 	@cp -R "$(DIST)/$(APP).app" "$(DIST)/stage/"
@@ -75,6 +75,9 @@ zip: $(DIST)/$(SLUG).app ## zip the app, preserving its signature
 	@ditto -c -k --sequesterRsrc --keepParent \
 		"$(DIST)/$(APP).app" "$(DIST)/$(SLUG)-$(VERSION).zip"
 	@echo "▸ $(DIST)/$(SLUG)-$(VERSION).zip  ($$(du -h "$(DIST)/$(SLUG)-$(VERSION).zip" | cut -f1))"
+
+docs: ## stamp the version from project.yml into the landing page
+	@python3 scripts/stamp-docs-version.py
 
 dist-clean:
 	@rm -rf $(DIST)

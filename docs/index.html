@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dynamic Notch</title>
+<meta name="description" content="The iPhone's Dynamic Island, for the MacBook Pro notch. Now playing, timers, a file shelf and AirPods — in the space you already have.">
+<meta property="og:title" content="Dynamic Notch">
+<meta property="og:description" content="The iPhone's Dynamic Island, for the MacBook Pro notch.">
+<meta property="og:image" content="icon.png">
+<meta property="og:type" content="website">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#000;
+  --ink:#f5f5f7;
+  --muted:#86868b;
+  --line:rgba(255,255,255,.10);
+  --card:rgba(255,255,255,.035);
+  --width:980px;
+  --ease:cubic-bezier(.32,.72,0,1);
+  /* Notch geometry: the shape is the camera gap plus an ear on each side. */
+  --gapW:150px;
+  --ear:50px;
+  --earWide:72px;
+  --notchH:26px;
+  --nav:64px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
+  font-size:17px;line-height:1.47;letter-spacing:-.012em;
+  -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow-x:hidden;
+}
+.wrap{max-width:var(--width);margin:0 auto;padding:0 22px}
+@media (prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;transition-duration:.001ms!important}
+}
+
+/* ---------- nav ---------- */
+nav{
+  position:sticky;top:0;z-index:60;height:var(--nav);
+  background:rgba(8,8,10,.7);backdrop-filter:saturate(180%) blur(22px);
+  -webkit-backdrop-filter:saturate(180%) blur(22px);
+  border-bottom:1px solid var(--line);
+}
+nav .wrap{display:flex;align-items:center;gap:12px;height:100%}
+nav .mark{display:flex;align-items:center;gap:11px;text-decoration:none;color:var(--ink)}
+nav .mark img{width:30px;height:30px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.5)}
+nav .mark b{font-size:16.5px;font-weight:600;letter-spacing:-.016em}
+nav .spacer{flex:1}
+nav a.link{color:var(--muted);text-decoration:none;font-size:14px;transition:color .25s;padding:6px 2px}
+nav a.link:hover{color:var(--ink)}
+nav .gh{
+  display:grid;place-items:center;width:36px;height:36px;border-radius:50%;
+  color:var(--muted);background:rgba(255,255,255,.06);border:1px solid var(--line);
+  transition:color .25s,background .25s,transform .25s var(--ease);
+}
+nav .gh:hover{color:var(--ink);background:rgba(255,255,255,.14);transform:scale(1.06)}
+nav .gh svg{width:19px;height:19px;display:block}
+
+/* ---------- hero ---------- */
+.hero{padding:70px 0 34px;text-align:center;position:relative}
+.hero::before{
+  content:"";position:absolute;inset:-14% -30% 34%;pointer-events:none;
+  background:radial-gradient(58% 48% at 50% 26%,rgba(96,128,255,.18),transparent 70%);filter:blur(22px);
+}
+.applogo{
+  width:104px;height:104px;border-radius:24px;margin:0 auto 26px;display:block;
+  box-shadow:0 22px 46px -14px rgba(0,0,0,.85),0 0 0 .5px rgba(255,255,255,.12);
+  animation:float 6s ease-in-out infinite;
+}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.eyebrow{
+  font-size:13.5px;font-weight:600;letter-spacing:.01em;
+  background:linear-gradient(90deg,#6ea8ff,#c07bff 55%,#ff8fa3);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+h1{font-size:clamp(40px,7.4vw,74px);line-height:1.05;font-weight:700;letter-spacing:-.028em;margin:12px 0 0}
+.sub{font-size:clamp(17px,2.3vw,21px);color:var(--muted);max-width:610px;margin:18px auto 0;letter-spacing:-.01em}
+
+/* ---------- the live notch ---------- */
+.stage{
+  position:relative;margin:44px auto 0;max-width:840px;width:100%;
+  aspect-ratio:16/10;border-radius:22px;overflow:hidden;
+  background:
+    radial-gradient(90% 70% at 22% 6%,#2d3a6e 0%,transparent 58%),
+    radial-gradient(70% 60% at 86% 18%,#5c2f6d 0%,transparent 60%),
+    linear-gradient(170deg,#161a30 0%,#0a0b15 60%,#06070d 100%);
+  border:1px solid rgba(255,255,255,.09);
+  box-shadow:0 40px 90px -30px rgba(0,0,0,.92),0 0 0 6px rgba(255,255,255,.02);
+}
+.menubar{
+  position:absolute;top:0;left:0;right:0;height:var(--notchH);display:flex;align-items:center;
+  padding:0 13px;gap:14px;font-size:11px;color:rgba(255,255,255,.66);font-weight:500;z-index:2;
+}
+.menubar .right{margin-left:auto;display:flex;gap:11px;align-items:center;opacity:.85}
+.menubar .dot{width:11px;height:11px;border-radius:3px;background:rgba(255,255,255,.34)}
+
+.notch{
+  position:absolute;top:0;left:50%;transform:translateX(-50%);z-index:5;
+  width:var(--gapW);height:var(--notchH);background:#000;
+  border-radius:0 0 11px 11px;overflow:hidden;cursor:pointer;
+  transition:width .6s var(--ease),height .6s var(--ease),border-radius .6s var(--ease),box-shadow .5s ease;
+}
+/* Ears appear either side of the camera gap, so the shape grows to hold them. */
+.notch.grown{width:calc(var(--gapW) + var(--ear)*2);border-radius:0 0 15px 15px}
+.notch.grown.wide{width:calc(var(--gapW) + var(--earWide)*2)}
+.notch.open{
+  width:min(460px,78%);height:162px;border-radius:0 0 26px 26px;
+  box-shadow:0 26px 54px -16px rgba(0,0,0,.85);
+}
+.pill{position:absolute;inset:0;display:flex;align-items:flex-start;opacity:0;transition:opacity .28s ease}
+.notch.grown .pill{opacity:1}
+.notch.open .pill{opacity:0;transition:opacity .15s ease}
+.gap{width:var(--gapW);flex:none}
+.ear{flex:1;height:var(--notchH);display:flex;align-items:center;padding:0 9px;min-width:0;overflow:hidden}
+.ear.r{justify-content:flex-end}
+
+.art{width:17px;height:17px;border-radius:4.5px;flex:none;
+  background:linear-gradient(140deg,#ffd36e,#ff7a59 48%,#c2508f);box-shadow:0 0 10px rgba(255,140,90,.5)}
+.bars{display:flex;align-items:center;gap:2.5px;height:13px}
+.bars i{width:2.5px;border-radius:2px;background:#ffb36b;height:4px;animation:eq .9s ease-in-out infinite}
+.bars i:nth-child(2){animation-delay:.16s}.bars i:nth-child(3){animation-delay:.33s}.bars i:nth-child(4){animation-delay:.08s}
+@keyframes eq{0%,100%{height:4px}50%{height:12px}}
+.ring{width:14px;height:14px;flex:none;border-radius:50%;
+  background:conic-gradient(#ff9f2e 62%,rgba(255,255,255,.18) 0);
+  -webkit-mask:radial-gradient(circle,transparent 48%,#000 50%);mask:radial-gradient(circle,transparent 48%,#000 50%)}
+.clockface{font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;color:#fff;margin-left:5px;white-space:nowrap}
+
+.panel{
+  position:absolute;inset:0;padding:calc(var(--notchH) + 8px) 18px 16px;display:flex;gap:14px;
+  opacity:0;transform:translateY(6px);pointer-events:none;
+  transition:opacity .32s ease .1s,transform .32s var(--ease) .1s;
+}
+.notch.open .panel{opacity:1;transform:none}
+.cover{width:76px;height:76px;border-radius:10px;flex:none;
+  background:linear-gradient(140deg,#ffd36e,#ff7a59 48%,#c2508f);
+  box-shadow:0 8px 26px rgba(255,120,80,.34),0 0 0 .5px rgba(255,255,255,.14)}
+.meta{flex:1;min-width:0;text-align:left}
+.meta .t{font-size:13.5px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meta .a{font-size:11.5px;color:rgba(255,255,255,.5);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.track{height:3.5px;border-radius:3px;background:rgba(255,255,255,.16);margin-top:14px;overflow:hidden}
+.track i{display:block;height:100%;width:38%;border-radius:3px;background:linear-gradient(90deg,#ffb36b,#ff8a5c)}
+.transport{display:flex;gap:7px;margin-top:13px;align-items:center}
+.btn{width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.1);display:grid;place-items:center}
+.btn.main{width:30px;height:30px;background:rgba(255,255,255,.2)}
+.btn span{width:0;height:0;border-left:7px solid rgba(255,255,255,.92);border-top:5px solid transparent;border-bottom:5px solid transparent}
+.btn.main span{border:none;width:8px;height:9px;border-left:2.5px solid #fff;border-right:2.5px solid #fff}
+.hint{margin-top:15px;font-size:12.5px;color:var(--muted)}
+
+/* ---------- buttons ---------- */
+.cta{display:flex;gap:11px;justify-content:center;flex-wrap:wrap;margin-top:28px}
+.button{display:inline-flex;align-items:center;gap:8px;padding:12px 23px;border-radius:980px;
+  font-size:15px;font-weight:500;text-decoration:none;transition:transform .2s var(--ease),background .25s}
+.button.primary{background:#f5f5f7;color:#000}
+.button.primary:hover{transform:scale(1.035);background:#fff}
+.button.ghost{background:rgba(255,255,255,.09);color:var(--ink);border:1px solid var(--line)}
+.button.ghost:hover{background:rgba(255,255,255,.15)}
+.button svg{width:17px;height:17px}
+.tiny{font-size:12.5px;color:var(--muted);margin-top:14px}
+.tiny b{color:rgba(255,255,255,.75);font-weight:600}
+
+/* ---------- scroll showcase ---------- */
+.showcase{position:relative;height:420vh;border-top:1px solid var(--line)}
+.pin{position:sticky;top:var(--nav);height:calc(100vh - var(--nav));min-height:560px;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:26px;padding:20px}
+.pin .stage{margin:0;max-width:min(760px,86vw)}
+.caps{position:relative;height:96px;width:100%;max-width:620px;text-align:center}
+.cap{position:absolute;inset:0;opacity:0;transform:translateY(12px);
+  transition:opacity .5s var(--ease),transform .5s var(--ease)}
+.cap.on{opacity:1;transform:none}
+.cap h3{font-size:clamp(22px,3.2vw,30px);font-weight:700;letter-spacing:-.022em}
+.cap p{color:var(--muted);font-size:15.5px;margin-top:8px}
+.dots{display:flex;gap:7px}
+.dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.22);transition:background .4s,transform .4s}
+.dots i.on{background:var(--ink);transform:scale(1.25)}
+
+/* ---------- sections ---------- */
+section.band{padding:88px 0;border-top:1px solid var(--line)}
+.kicker{font-size:12.5px;font-weight:600;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+h2{font-size:clamp(28px,4.4vw,44px);line-height:1.12;font-weight:700;letter-spacing:-.024em;margin-top:10px}
+.lede{color:var(--muted);font-size:clamp(16px,2vw,19px);max-width:640px;margin-top:14px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(248px,1fr));gap:14px;margin-top:40px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:17px;padding:24px;
+  transition:transform .4s var(--ease),background .4s,border-color .4s}
+.card:hover{transform:translateY(-3px);background:rgba(255,255,255,.06);border-color:rgba(255,255,255,.18)}
+.card h3{font-size:17px;font-weight:600;letter-spacing:-.014em}
+.card p{color:var(--muted);font-size:14.5px;margin-top:7px}
+.glyph{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:17px;
+  margin-bottom:15px;background:rgba(255,255,255,.08)}
+table{width:100%;border-collapse:collapse;margin-top:34px;font-size:14.5px}
+td{padding:14px 0;border-bottom:1px solid var(--line);color:var(--muted);vertical-align:top}
+td:first-child{color:var(--ink);font-weight:500;width:33%;padding-right:18px}
+tr:last-child td{border-bottom:none}
+.note{margin-top:32px;padding:20px 22px;border-radius:15px;
+  background:rgba(255,183,77,.07);border:1px solid rgba(255,183,77,.2)}
+.note p{color:var(--muted);font-size:14.5px;margin-top:6px}
+code{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,monospace;font-size:12.5px;
+  background:rgba(255,255,255,.08);padding:2.5px 7px;border-radius:6px;color:#e8e8ed}
+pre{margin-top:12px;padding:15px 17px;border-radius:12px;overflow-x:auto;
+  background:rgba(255,255,255,.05);border:1px solid var(--line)}
+pre code{background:none;padding:0;font-size:12.5px;line-height:1.7}
+footer{padding:44px 0 62px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px}
+footer a{color:var(--muted)}
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .85s var(--ease),transform .85s var(--ease)}
+.reveal.in{opacity:1;transform:none}
+
+@media (max-width:700px){
+  :root{--gapW:104px;--ear:42px;--earWide:60px;--notchH:22px;--nav:56px}
+  .hero{padding:48px 0 26px}
+  .applogo{width:84px;height:84px;border-radius:20px}
+  .notch.open{width:88%;height:148px}
+  .cover{width:62px;height:62px}
+  .showcase{height:380vh}
+  section.band{padding:62px 0}
+  nav a.link{display:none}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="mark" href="#top"><img src="icon.png" alt=""><b>Dynamic Notch</b></a>
+    <span class="spacer"></span>
+    <a class="link" href="#features">Features</a>
+    <a class="link" href="#built">How it works</a>
+    <a class="link" href="#install">Install</a>
+    <a class="gh" href="https://github.com/shankar-sachin/dynamic-notch" aria-label="View on GitHub">
+      <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+    </a>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <img class="applogo" src="icon.png" alt="Dynamic Notch">
+    <p class="eyebrow">For MacBook Pro</p>
+    <h1>Your notch,<br>finally doing something.</h1>
+    <p class="sub">
+      The black bar at the top of your screen has been sitting there doing nothing
+      since 2021. Now it plays your music, counts your timers, catches your files
+      and greets your AirPods.
+    </p>
+
+    <div class="stage" data-notch>
+      <div class="menubar">
+        <b style="color:rgba(255,255,255,.88)">Finder</b><span>File</span><span>Edit</span><span>View</span>
+        <span class="right"><span class="dot"></span><span class="dot"></span><span>100%</span><span>9:41</span></span>
+      </div>
+      <div class="notch" data-shape>
+        <div class="pill">
+          <div class="ear" data-lead></div>
+          <div class="gap"></div>
+          <div class="ear r" data-trail></div>
+        </div>
+        <div class="panel">
+          <div class="cover"></div>
+          <div class="meta">
+            <div class="t">Everything In Its Right Place</div>
+            <div class="a">Radiohead — Kid A</div>
+            <div class="track"><i></i></div>
+            <div class="transport">
+              <div class="btn"><span style="transform:rotate(180deg)"></span></div>
+              <div class="btn main"><span></span></div>
+              <div class="btn"><span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <p class="hint">Hover the notch — it behaves like the real thing.</p>
+
+    <div class="cta">
+      <a class="button primary" href="https://github.com/shankar-sachin/dynamic-notch/releases/download/v1.0.0/DynamicNotch-1.0.dmg">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 1v8.6l3-3 1 1-4.7 4.7L2.6 7.6l1-1 3 3V1h1.4ZM2 13h12v1.5H2V13Z"/></svg>
+        Download for macOS
+      </a>
+      <a class="button ghost" href="https://github.com/shankar-sachin/dynamic-notch">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        Source code
+      </a>
+    </div>
+    <p class="tiny">Free and open source · <b>Version 1.0</b> · Requires macOS 26 or later</p>
+  </div>
+</header>
+
+<!-- Scroll-driven: the notch is pinned and steps through its states. -->
+<section class="showcase" id="showcase">
+  <div class="pin">
+    <div class="stage" data-notch>
+      <div class="menubar">
+        <b style="color:rgba(255,255,255,.88)">Finder</b><span>File</span><span>Edit</span><span>View</span>
+        <span class="right"><span class="dot"></span><span class="dot"></span><span>100%</span><span>9:41</span></span>
+      </div>
+      <div class="notch" data-shape>
+        <div class="pill">
+          <div class="ear" data-lead></div>
+          <div class="gap"></div>
+          <div class="ear r" data-trail></div>
+        </div>
+        <div class="panel">
+          <div class="cover"></div>
+          <div class="meta">
+            <div class="t">Everything In Its Right Place</div>
+            <div class="a">Radiohead — Kid A</div>
+            <div class="track"><i></i></div>
+            <div class="transport">
+              <div class="btn"><span style="transform:rotate(180deg)"></span></div>
+              <div class="btn main"><span></span></div>
+              <div class="btn"><span></span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="caps">
+      <div class="cap"><h3>At rest, it isn't there.</h3><p>The exact size of your notch, in the same black, with no corner flare. It disappears into the hardware.</p></div>
+      <div class="cap"><h3>Music arrives in the ears.</h3><p>Artwork on one side, a visualiser on the other — around the camera, never across it.</p></div>
+      <div class="cap"><h3>Reach for it and it unfurls.</h3><p>A scrubber, transport and album art. The window never resizes; the shape does.</p></div>
+      <div class="cap"><h3>Two things at once.</h3><p>A timer counts down in one ear while the music carries on in the other, exactly like the real island.</p></div>
+    </div>
+
+    <div class="dots"><i></i><i></i><i></i><i></i></div>
+  </div>
+</section>
+
+<section class="band" id="features">
+  <div class="wrap reveal">
+    <p class="kicker">What it does</p>
+    <h2>Six things, in the space you already had.</h2>
+    <p class="lede">Every one lives in the same black shape, so nothing new competes for room on your screen.</p>
+    <div class="grid">
+      <div class="card"><div class="glyph">♫</div><h3>Now Playing</h3><p>Album art in one ear, a visualiser in the other. Open it for a scrubber and transport. Music and Spotify.</p></div>
+      <div class="card"><div class="glyph">◷</div><h3>Timer &amp; Stopwatch</h3><p>A ring that drains beside the time. Timers running in Apple's Clock app are mirrored here too.</p></div>
+      <div class="card"><div class="glyph">⌁</div><h3>Volume &amp; brightness</h3><p>An inline bar in the notch, instead of the blurry square in the middle of your screen.</p></div>
+      <div class="card"><div class="glyph">⇩</div><h3>File shelf</h3><p>Drag files at the notch and it opens to catch them. Drag them back out into any app.</p></div>
+      <div class="card"><div class="glyph">◎</div><h3>AirPods</h3><p>Connect them and it throws itself open: the case turning on the spot, buds lifting out, left, right and case charge.</p></div>
+      <div class="card"><div class="glyph">⚡︎</div><h3>Ambient events</h3><p>Charger in, battery low, a padlock when you lock, a dot while the microphone is live.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="built">
+  <div class="wrap reveal">
+    <p class="kicker">How it's built</p>
+    <h2>The window never resizes.</h2>
+    <p class="lede">
+      That's the whole trick. The panel is permanently the size of its largest state,
+      transparent, and click-through everywhere it isn't drawing — so your menu bar stays
+      usable. Every open, close and morph is a shape animating inside a window that never
+      moves, which is why it flows like one object instead of stepping a frame at a time.
+    </p>
+    <p class="lede">
+      At rest it is the exact size of your notch, in the same dead black, with zero corner
+      flare. Every spring in the app is defined in one file, so the whole surface
+      accelerates and settles together.
+    </p>
+    <table>
+      <tr><td>Now playing</td><td>Apple events, plus each app's distributed notifications for instant reactions. No private APIs.</td></tr>
+      <tr><td>Volume</td><td>CoreAudio property listeners — event-driven, no polling.</td></tr>
+      <tr><td>Brightness</td><td>Polled, with an ambient-light filter: the sensor ramps, a key press is one jump out of stillness.</td></tr>
+      <tr><td>AirPods battery</td><td><code>system_profiler</code>, which reports left, right and case separately.</td></tr>
+      <tr><td>Hover</td><td>Global <code>NSEvent</code> monitors — no Accessibility prompt.</td></tr>
+      <tr><td>Permissions</td><td>One, for Automation, and only so it can ask Music and Spotify what's playing.</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="band" id="install">
+  <div class="wrap reveal">
+    <p class="kicker">Install</p>
+    <h2>Drag it to Applications.</h2>
+    <p class="lede">
+      Download the disk image, drag Dynamic Notch across, and open it. There's no Dock
+      icon — look in the menu bar, and look up.
+    </p>
+    <div class="note">
+      <b>macOS will refuse to open it the first time.</b>
+      <p>
+        This app isn't notarised — that needs a paid Apple Developer account — so Gatekeeper
+        has nothing to check it against. Every unnotarised app gets the same dialog; it isn't
+        a warning about this one in particular. Go to
+        <b>System&nbsp;Settings → Privacy&nbsp;&amp;&nbsp;Security</b>, scroll down, click
+        <b>Open Anyway</b>, and open it again. Or, from Terminal:
+      </p>
+      <pre><code>xattr -dr com.apple.quarantine "/Applications/Dynamic Notch.app"</code></pre>
+    </div>
+    <table>
+      <tr><td>Version</td><td>1.0</td></tr>
+      <tr><td>Requires</td><td>macOS 26 or later. Apple silicon or Intel.</td></tr>
+      <tr><td>A notch</td><td>Not required — Macs without one get a notch of pleasant proportions drawn in the same place.</td></tr>
+      <tr><td>Building it</td><td><code>make run</code> builds and launches; <code>make dmg</code> packages a release.</td></tr>
+    </table>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a href="https://github.com/shankar-sachin/dynamic-notch">Dynamic Notch</a> — free and open source.
+    Not affiliated with Apple. AirPods, Mac and MacBook Pro are trademarks of Apple Inc.
+  </div>
+</footer>
+
+<script>
+(function(){
+  var calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  var BARS  = '<div class="bars"><i></i><i></i><i></i><i></i></div>';
+  var ART   = '<div class="art"></div>';
+  var TIMER = '<div class="ring"></div><span class="clockface">4:22</span>';
+
+  // The states the app itself moves through.
+  var STATES = [
+    {cls:'',                 lead:'',    trail:''},
+    {cls:'grown',            lead:ART,   trail:BARS},
+    {cls:'grown open',       lead:ART,   trail:BARS},
+    {cls:'grown wide',       lead:ART,   trail:TIMER}
+  ];
+
+  function Notch(stage){
+    this.shape = stage.querySelector('[data-shape]');
+    this.lead  = stage.querySelector('[data-lead]');
+    this.trail = stage.querySelector('[data-trail]');
+    this.at    = -1;
+  }
+  Notch.prototype.show = function(i){
+    if (i === this.at) return;
+    this.at = i;
+    var s = STATES[i];
+    this.shape.className = 'notch ' + s.cls;
+    this.lead.innerHTML  = s.lead;
+    this.trail.innerHTML = s.trail;
+  };
+
+  var stages = document.querySelectorAll('[data-notch]');
+  var hero = new Notch(stages[0]);
+
+  /* Hero: cycles on its own, and hovering takes over exactly like the app. */
+  var order = [1,2,3,0], step = 0, held = false, timer;
+  function cycle(){
+    if (held) return;
+    hero.show(order[step % order.length]);
+    step++;
+    timer = setTimeout(cycle, 3200);
+  }
+  hero.shape.addEventListener('mouseenter', function(){
+    held = true; clearTimeout(timer); hero.show(2);
+  });
+  hero.shape.addEventListener('mouseleave', function(){
+    held = false; hero.show(1); timer = setTimeout(cycle, 900);
+  });
+  if (calm) hero.show(1); else timer = setTimeout(cycle, 700);
+
+  /* Showcase: pinned, and the scroll position picks the state. */
+  var showcase = document.getElementById('showcase');
+  var pinned = new Notch(stages[1]);
+  var caps = showcase.querySelectorAll('.cap');
+  var dots = showcase.querySelectorAll('.dots i');
+  var ticking = false;
+
+  function sync(){
+    ticking = false;
+    var box = showcase.getBoundingClientRect();
+    var travel = showcase.offsetHeight - window.innerHeight;
+    if (travel <= 0) return;
+    var p = Math.min(Math.max(-box.top / travel, 0), 1);
+    // Four beats, with the last holding to the end of the scroll.
+    var i = Math.min(Math.floor(p * 4), 3);
+    pinned.show(i);
+    for (var n = 0; n < caps.length; n++){
+      caps[n].classList.toggle('on', n === i);
+      dots[n].classList.toggle('on', n === i);
+    }
+  }
+  addEventListener('scroll', function(){
+    if (!ticking){ ticking = true; requestAnimationFrame(sync); }
+  }, {passive:true});
+  addEventListener('resize', sync);
+  sync();
+
+  var io = new IntersectionObserver(function(es){
+    es.forEach(function(e){ if (e.isIntersecting) e.target.classList.add('in'); });
+  }, {threshold:.12});
+  document.querySelectorAll('.reveal').forEach(function(el){ io.observe(el); });
+})();
+</script>
+</body>
+</html>
