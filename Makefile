@@ -8,7 +8,7 @@ BUNDLE   := $(DERIVED)/Build/Products/$(CONFIG)/$(APP).app
 RELEASE  := $(DERIVED)/Build/Products/Release/$(APP).app
 # Artifact names have no spaces: they end up in download URLs.
 SLUG     := DynamicNotch
-VERSION  := $(shell /usr/libexec/PlistBuddy -c "Print MARKETING_VERSION" /dev/stdin <<< "$$(plutil -convert xml1 -o - Sources/DynamicNotch/Resources/Info.plist 2>/dev/null)" 2>/dev/null || echo 1.0)
+VERSION  := $(shell awk -F'"' '/MARKETING_VERSION/{print $$2; exit}' project.yml)
 
 .PHONY: all project build run kill clean test install uninstall logs release dmg zip dist-clean docs
 
