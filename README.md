@@ -177,3 +177,10 @@ bezel melting outward instead of a bar taped under the menu bar.
 - Now Playing covers Music and Spotify. Browser and IINA audio are invisible,
   because the system-wide API for it is entitlement-gated as of macOS 15.4.
   `NowPlayingSource` is the seam where a wider backend would slot in.
+
+## Licence
+
+[MIT](LICENSE). Do what you like with it.
+
+Not affiliated with Apple. AirPods, AirDrop, Mac, MacBook Pro and Spotify are
+trademarks of their respective owners.

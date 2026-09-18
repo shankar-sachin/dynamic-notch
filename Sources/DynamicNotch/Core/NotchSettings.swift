@@ -46,7 +46,10 @@ final class NotchSettings {
         showNowPlaying = flag("showNowPlaying", default: true)
         showVolumeHUD = flag("showVolumeHUD", default: true)
         showBrightnessHUD = flag("showBrightnessHUD", default: true)
-        showKeyboardBacklightHUD = flag("showKeyboardBacklightHUD", default: true)
+        // Off by default: the keyboard backlight is driven by the ambient light
+        // sensor as much as by you, so it's the one HUD that interrupts without
+        // being asked. Available for anyone who wants it, but opt-in.
+        showKeyboardBacklightHUD = flag("showKeyboardBacklightHUD", default: false)
         showPowerEvents = flag("showPowerEvents", default: true)
         showDeviceEvents = flag("showDeviceEvents", default: true)
         expandForAirPods = flag("expandForAirPods", default: true)

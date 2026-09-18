@@ -27,7 +27,7 @@
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>
-	<string>Dynamic Notch</string>
+	<string>Copyright © 2026 Sachin Shankar. MIT licensed.</string>
 	<key>NSAppleEventsUsageDescription</key>
 	<string>Dynamic Notch reads what Music and Spotify are playing so it can show it in your notch, and sends play, pause and skip commands when you use the controls.</string>
 	<key>NSBluetoothAlwaysUsageDescription</key>

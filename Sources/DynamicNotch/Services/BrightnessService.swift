@@ -17,6 +17,12 @@ import CoreGraphics
 /// press is a single jump out of stillness. So a change only counts if the
 /// previous tick was quiet. Once that's fired, a 1.6s window lets a held key
 /// keep updating the bar smoothly.
+///
+/// Waking is the exception that defeats all of that. Both levels go from nothing
+/// to their target in one step when the lid opens or the display comes back —
+/// a perfect jump out of perfect stillness, and exactly what a key press looks
+/// like. So after any wake the next few seconds are absorbed: the new levels are
+/// adopted as the baseline without a word.
 @MainActor
 final class BrightnessService {
     private let model: NotchViewModel
@@ -31,6 +37,10 @@ final class BrightnessService {
     private var display = Channel()
     private var keyboardChannel = Channel()
     private var alertUntil: Date = .distantPast
+    /// Changes before this moment are treated as the machine waking, not you.
+    private var settleUntil: Date = .distantPast
+    private var workspaceObservers: [NSObjectProtocol] = []
+    private var distributedObservers: [NSObjectProtocol] = []
 
     /// Key steps are 1/16 = 0.0625. The screen is steadier than the keyboard
     /// backlight, so it can afford a finer threshold.
@@ -64,6 +74,7 @@ final class BrightnessService {
     func start() {
         display.level = readDisplay()
         keyboardChannel.level = keyboard?.read()
+        observeWake()
 
         task = Task { [weak self] in
             while !Task.isCancelled {
@@ -77,6 +88,44 @@ final class BrightnessService {
     func stop() {
         task?.cancel()
         task = nil
+        // Each token belongs to the centre that issued it.
+        let workspace = NSWorkspace.shared.notificationCenter
+        workspaceObservers.forEach(workspace.removeObserver)
+        workspaceObservers.removeAll()
+
+        let distributed = DistributedNotificationCenter.default()
+        distributedObservers.forEach(distributed.removeObserver)
+        distributedObservers.removeAll()
+    }
+
+    /// Everything that means "the machine just came back".
+    private func observeWake() {
+        let workspace = NSWorkspace.shared.notificationCenter
+        for name in [
+            NSWorkspace.didWakeNotification,
+            NSWorkspace.screensDidWakeNotification,
+            NSWorkspace.sessionDidBecomeActiveNotification,
+        ] {
+            workspaceObservers.append(
+                workspace.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                    MainActor.assumeIsolated { self?.settle() }
+                }
+            )
+        }
+        distributedObservers.append(
+            DistributedNotificationCenter.default().addObserver(
+                forName: Notification.Name("com.apple.screenIsUnlocked"),
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                MainActor.assumeIsolated { self?.settle() }
+            }
+        )
+    }
+
+    private func settle() {
+        settleUntil = .now.addingTimeInterval(4)
+        Log.system.info("brightness settling after wake")
     }
 
     // MARK: Polling
@@ -107,6 +156,9 @@ final class BrightnessService {
         }
 
         guard abs(delta) > threshold else { return }
+
+        // Just woken: adopt whatever the levels have become, say nothing.
+        guard Date.now >= settleUntil else { return }
 
         // Mid-gesture the bar is already up, so let every step through and keep
         // it smooth. Otherwise demand stillness before the jump — that's what
