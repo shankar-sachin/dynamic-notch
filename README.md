@@ -44,14 +44,53 @@ pointer to it and it unfurls into a player and a file shelf.
 - **Menu bar manners** — folds away the instant any menu opens, so it never lands
   on top of what you're reading.
 
-## Running it
+## Installing
+
+Grab `DynamicNotch-x.y.dmg` from [Releases](../../releases), drag it to
+Applications, and open it. There's no Dock icon — look in the menu bar, and look
+up.
+
+**macOS will refuse to open it the first time.** The app isn't notarised, which
+needs a paid Apple Developer account, so Gatekeeper has nothing to check it
+against and blocks it. It isn't a warning about this app specifically; every
+unnotarised app gets it. To get past it:
+
+> System Settings → Privacy & Security → scroll down → **Open Anyway**
+
+then open the app again. Or from Terminal:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Dynamic Notch.app"
+```
+
+The first time it reads what's playing, macOS asks for Automation permission for
+Music and Spotify. Say yes, or the player stays empty.
+
+## Building it
 
 ```sh
 make run        # build, sign and launch
 make install    # copy to /Applications and launch from there
 make test       # unit tests
 make logs       # stream the app's own log
+make dmg        # drag-to-install .dmg in dist/, for a release
+make zip        # zipped .app, signature preserved
 ```
+
+`dist/` is ignored by git; release artifacts don't belong in the repo.
+
+Release builds are signed **ad-hoc** rather than with an Apple Development
+certificate. That certificate is personal, and for anyone else downloading the
+app it buys nothing — without a Developer ID *and* notarisation, Gatekeeper
+stops it either way. One consequence worth knowing: an ad-hoc signature changes
+on every build, so macOS treats each new version as a different app and asks for
+Automation permission again.
+
+To ship it properly — no scary dialog, permissions that persist across updates —
+needs the paid Apple Developer Program ($99/yr) for a *Developer ID Application*
+certificate, then `ENABLE_HARDENED_RUNTIME=YES`, signing with that identity, and
+`xcrun notarytool submit` + `xcrun stapler staple`. The `dmg` target is the right
+place to add those three steps.
 
 Requires Xcode 26+ and macOS 26+ (it uses Liquid Glass for the controls). On a Mac without a notch, a notch of
 pleasant proportions is drawn in the same place.
